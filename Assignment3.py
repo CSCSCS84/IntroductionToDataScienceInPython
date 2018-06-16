@@ -1,13 +1,13 @@
 import pandas as pd
 import numpy as np
-import re
 
 energy = pd.DataFrame()
 gpd = pd.DataFrame()
 ScimEn = pd.DataFrame()
 
 
-def answer_one():
+def readAndPrepareEnergyData():
+
     columns = ['Country', 'Energy Supply', 'Energy Supply per Capita', '% Renewable']
     energy = pd.read_excel('Energy Indicators.xls', skiprows=17, header=0, usecols=[2, 3, 4, 5], skipfooter=38,
                            names=columns)
@@ -24,18 +24,25 @@ def answer_one():
     energy = energy.replace(['...'], [np.NaN], regex=True)
     energy.astype(dtype={'Energy Supply': float, 'Energy Supply per Capita': float, '% Renewable': float},
                   errors='raise', copy=False)
-
     energy['Energy Supply'] = energy['Energy Supply'].multiply(1000000)
 
-    gpd = pd.read_csv('world_bank.csv', skiprows=4, header=0)
+def readAndPrepareGPDData():
 
+    gpd = pd.read_csv('world_bank.csv', skiprows=4, header=0)
     gpd = gpd.set_index('Country Name')
     gpd.rename(index={"Korea, Rep.": 'South Korea'}, inplace=True)
     gpd.rename(index={"Iran, Islamic Rep.": "Iran"}, inplace=True)
     gpd.rename(index={"Hong Kong SAR, China": "Hong Kong"}, inplace=True)
 
+def readAndPrepareScimEnData():
+
     ScimEn = pd.read_excel('scimagojr-3.xlsx', header=0)
     ScimEn = ScimEn.set_index('Country')
+
+def answer_one():
+    readAndPrepareEnergyData()
+    readAndPrepareGPDData()
+    readAndPrepareScimEnData()
 
     gpdMergeRows = ['2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015']
     result = pd.merge(energy, gpd[gpdMergeRows], how='inner', left_index=True, right_index=True)
@@ -129,6 +136,7 @@ def answer_eleven():
     avg.index.names = ['Continent']
     return avg
 
+
 def answer_twelve():
     Top15 = answer_one()
     ContinentDict = {'China': 'Asia',
@@ -147,8 +155,9 @@ def answer_twelve():
                      'Australia': 'Australia',
                      'Brazil': 'South America'}
     Top15['Continent'] = [ContinentDict[country] for country in Top15.index]
-    Top15['bins']=pd.cut(Top15['% Renewable'],5)
+    Top15['bins'] = pd.cut(Top15['% Renewable'], 5)
     return Top15.groupby(['Continent', 'bins']).size()
+
 
 def answer_thirteen():
     Top15 = answer_one()
@@ -156,6 +165,7 @@ def answer_thirteen():
     Top15['PopEst'] = Top15.apply(lambda x: "{:,}".format(x['PopEst']), axis=1)
 
     return Top15['PopEst']
+
 
 print(answer_thirteen())
 
