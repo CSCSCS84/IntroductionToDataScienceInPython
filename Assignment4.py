@@ -67,11 +67,7 @@ def get_recession_bottom():
     return gpd.at[bottom, 'Quarter']
 
 
-def convert_housing_data_to_quarters():
-    homes = pd.read_csv('City_Zhvi_AllHomes.csv', header=0)
-    columnsYear = [year for year in homes.columns if year[0] == '2']
-    columnsState = ["State", "RegionName"]
-    homes.fillna(0, inplace=True)
+def findQuarters(columnsYear):
     quarters = []
     for i in range(int(np.ceil(len(columnsYear) / 3))):
         q = i % 4 + 1
@@ -86,12 +82,24 @@ def convert_housing_data_to_quarters():
         list = [str(year) + '-' + ("%02d" % (i + (quarter - 1) * 3)) for i in range(1, 4)]
 
         quartersDict[q] = list
-    for q, v in quartersDict.items():
-        vcopy = [e for e in v if e <= '2016-08']
 
-        homes[q] = homes[vcopy].mean(axis=1)
-    columnsState.extend(quarters)
-    homes = homes[columnsState]
+    return quartersDict
+
+
+def convert_housing_data_to_quarters():
+    homes = pd.read_csv('City_Zhvi_AllHomes.csv', header=0)
+    years = [year for year in homes.columns if year[0] == '2']
+    homes.fillna(0, inplace=True)
+
+    quarters = findQuarters(years)
+
+    for quarter, months in quarters.items():
+        monthsCopy = [m for m in months if m <= '2016-08']
+        homes[quarter] = homes[monthsCopy].mean(axis=1)
+
+    columns = ["State", "RegionName"]
+    columns.extend(quarters.keys())
+    homes = homes[columns]
     homes['State'] = homes['State'].map(
         {'OH': 'Ohio', 'KY': 'Kentucky', 'AS': 'American Samoa', 'NV': 'Nevada', 'WY': 'Wyoming', 'NA': 'National',
          'AL': 'Alabama', 'MD': 'Maryland', 'AK': 'Alaska', 'UT': 'Utah', 'OR': 'Oregon', 'MT': 'Montana',
@@ -109,22 +117,20 @@ def convert_housing_data_to_quarters():
 
 
 def run_ttest():
-
     recessionStart = get_recession_start()
     recessionBottom = get_recession_bottom()
     housePrices = convert_housing_data_to_quarters()
     housePricesRecession = housePrices[recessionStart] - housePrices[recessionBottom]
 
     univerityTowns = get_list_of_university_towns()
-    print(housePricesRecession)
-    universityTownsCopy = univerityTowns.set_index(['State', 'RegionName'])
-    a = housePricesRecession.loc[universityTownsCopy.index]
-    b = housePricesRecession.loc[housePricesRecession.index.difference(universityTownsCopy.index)]
-    a = a.dropna()
+    univerityTowns = univerityTowns.set_index(['State', 'RegionName'])
+    housePricesUniversity = housePricesRecession.loc[univerityTowns.index]
+    housePricesNonUniversity = housePricesRecession.loc[housePricesRecession.index.difference(univerityTowns.index)]
+    housePricesUniversity = housePricesUniversity.dropna()
 
-    test = stats.ttest_ind(a, b, equal_var=False)
+    ttest = stats.ttest_ind(housePricesUniversity, housePricesNonUniversity, equal_var=False)
 
-    return (True, test.pvalue, 'university town')
+    return (ttest.pvalue<0.01, ttest.pvalue, 'university town')
 
 
 print(run_ttest())
